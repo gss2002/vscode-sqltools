@@ -5,13 +5,19 @@ import { DRIVER_ALIASES } from './constants';
 
 const driverName = 'Redshift';
 export async function activate(extContext: ExtensionContext): Promise<IDriverExtensionApi> {
+  console.log('Activating SQLTools Redshift Driver extension');
+
   const sqltools = vscode.extensions.getExtension<IExtension>('mtxr.sqltools');
   if (!sqltools) {
+    console.error('SQLTools extension not found');
     throw new Error('SQLTools not installed');
   }
+
+  console.log('SQLTools extension found, activating...');
   await sqltools.activate();
 
   const api = sqltools.exports;
+  console.log('SQLTools API obtained:', api);
 
   // Register resources using resourcesMap
   const resources = api.resourcesMap();
@@ -66,7 +72,8 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
         }
       };
 
-      // Register the driver via the plugin
+      console.log(`Registering Redshift driver with aliases: ${DRIVER_ALIASES.map(({ value }) => value).join(', ')}`);
+
       return {
         type: 'driver',
         name: driverName,
@@ -77,12 +84,17 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
   };
 
   // Register the plugin with SQLTools
+  console.log('Registering Redshift driver plugin with SQLTools');
   api.registerPlugin(plugin);
+
+  console.log('Redshift driver plugin registered successfully');
 
   return {
     driverName,
-    driverAliases: DRIVER_ALIASES as IDriverAlias[], // Add driverAliases
+    driverAliases: DRIVER_ALIASES as IDriverAlias[],
   };
 }
 
-export function deactivate() {}
+export function deactivate() {
+  console.log('Deactivating SQLTools Redshift Driver extension');
+}
