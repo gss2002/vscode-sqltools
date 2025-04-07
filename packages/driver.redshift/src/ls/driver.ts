@@ -1,19 +1,23 @@
-import { BaseDriver, IConnection, NSDatabase, ContextValue } from '@sqltools/base-driver';
+import BaseDriver from '@sqltools/base-driver';
+import { NSDatabase, ContextValue, MConnectionExplorer } from '@sqltools/types';
 import { Pool, PoolConfig } from 'pg';
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
 import { RedshiftClient, DescribeClustersCommand, GetClusterCredentialsCommand } from '@aws-sdk/client-redshift';
 import { IRedshiftConnection } from '../types';
 import * as vscode from 'vscode';
+import queries from './queries';
 
-export default class RedshiftDriver extends BaseDriver<Pool> {
+export default class RedshiftDriver extends BaseDriver<Pool, {}> {
   private pool: Pool | null = null;
+  public declare credentials: IRedshiftConnection;
+  public queries = queries;
 
-  public async open(): Promise<void> {
+  public async open(): Promise<Pool> {
     if (this.pool) {
-      return;
+      return this.pool;
     }
 
-    const { roleArn, clusterIdentifier, database, region, dbUser, dbGroup, durationSeconds } = this.connection as IRedshiftConnection;
+    const { roleArn, clusterIdentifier, database, region, dbUser, dbGroup, durationSeconds } = this.credentials as IRedshiftConnection;
 
     // Prompt for Role ARN if not provided
     let finalRoleArn = roleArn;
@@ -104,6 +108,8 @@ export default class RedshiftDriver extends BaseDriver<Pool> {
 
       // Log connection details for debugging
       console.log(`Connected to Redshift: host=${host}, port=${port}, user=${getCredentialsResponse.DbUser}`);
+
+      return this.pool;
     } catch (error) {
       throw new Error(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -126,7 +132,7 @@ export default class RedshiftDriver extends BaseDriver<Pool> {
     try {
       const result = await this.pool.query(query);
       return [{
-        connId: this.connection.id,
+        connId: this.credentials.id,
         cols: result.fields.map(f => f.name),
         results: result.rows,
         query,
@@ -144,11 +150,25 @@ export default class RedshiftDriver extends BaseDriver<Pool> {
     await this.close();
   }
 
-  public async getChildrenForItem({ item }: { item: NSDatabase.IItem }): Promise<NSDatabase.IItem[]> {
+  public async getChildrenForItem({ item }: { item: MConnectionExplorer.IChildItem }): Promise<MConnectionExplorer.IChildItem[]> {
     if (item.type === ContextValue.CONNECTION) {
       return [
-        { label: 'Tables', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.TABLE },
-        { label: 'Schemas', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.SCHEMA },
+        { 
+          label: 'Tables', 
+          type: ContextValue.RESOURCE_GROUP, 
+          iconId: 'folder', 
+          childType: ContextValue.TABLE,
+          schema: '',
+          database: this.credentials.database
+        },
+        { 
+          label: 'Schemas', 
+          type: ContextValue.RESOURCE_GROUP, 
+          iconId: 'folder', 
+          childType: ContextValue.SCHEMA,
+          schema: '',
+          database: this.credentials.database
+        },
       ];
     }
     return [];
@@ -158,13 +178,18 @@ export default class RedshiftDriver extends BaseDriver<Pool> {
     return [];
   }
 
-  public async describeTable(): Promise<NSDatabase.IColumn[]> {
-    // Minimal implementation for now
-    return [];
+  public async describeTable(metadata: NSDatabase.ITable, _opt: any): Promise<NSDatabase.IResult[]> {
+    const query = queries.describeTable({ ...metadata, type: ContextValue.TABLE, isView: false }).toString();
+    const results = await this.query(query);
+    return results;
   }
 
-  public async showRecords(): Promise<NSDatabase.IResult[]> {
-    // Minimal implementation for now
-    return [];
+  public async showRecords(table: NSDatabase.ITable, opt: { limit: number; page?: number } & any): Promise<NSDatabase.IResult[]> {
+    const limit = opt.limit || 50;
+    const offset = opt.page ? (opt.page - 1) * limit : 0;
+    const fetchQuery = queries.fetchRecords({ table, limit, offset }).toString();
+    const countQuery = queries.countRecords({ table }).toString();
+    const results = await this.query(`${fetchQuery}\n${countQuery}`);
+    return results;
   }
 }

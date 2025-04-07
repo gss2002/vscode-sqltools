@@ -140,24 +140,25 @@
   "dependencies": {
     "@aws-sdk/client-redshift": "^3.556.0",
     "@aws-sdk/client-sts": "^3.556.0",
-    "pg": "^8.2.1",
     "@sqltools/base-driver": "file:../base-driver",
-    "@sqltools/types": "file:../types",
     "@sqltools/log": "file:../log",
-    "lodash": "^4.17.19"
+    "@sqltools/types": "file:../types",
+    "lodash": "^4.17.19",
+    "pg": "^8.2.1"
   },
   "devDependencies": {
     "@sqltools/base-driver": "latest",
     "@sqltools/types": "^0.1.6",
     "@types/lodash": "^4.14.123",
+    "@types/node": "^22.14.0",
     "@types/pg": "^7.14.3",
     "@types/vscode": "^1.72.0",
+    "@vscode/vsce": "^2.19.0",
     "concurrently": "^5.2.0",
     "esbuild": "^0.25.0",
-    "rimraf": "^3.0.2",
-    "typescript": "~4.8.3",
-    "@vscode/vsce": "^2.19.0",
     "patch-package": "^8.0.0",
-    "postinstall-postinstall": "^2.1.0"
+    "postinstall-postinstall": "^2.1.0",
+    "rimraf": "^3.0.2",
+    "typescript": "~4.8.3"
   }
 }
