@@ -1,238 +1,170 @@
-import { Pool, PoolConfig, PoolClient, types, FieldDef } from 'pg';
-import Queries from './queries';
-import { IConnectionDriver, NSDatabase, Arg0, ContextValue, MConnectionExplorer } from '@sqltools/types';
-import AbstractDriver from '@sqltools/base-driver';
-import fs from 'fs';
-import zipObject from 'lodash/zipObject';
-import { parse as queryParse } from '@sqltools/util/query';
-import generateId from '@sqltools/util/internal-id';
+import { BaseDriver, IConnection, NSDatabase, ContextValue } from '@sqltools/base-driver';
+import { Pool, PoolConfig } from 'pg';
+import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
+import { RedshiftClient, DescribeClustersCommand, GetClusterCredentialsCommand } from '@aws-sdk/client-redshift';
+import { IRedshiftConnection } from '../types';
+import * as vscode from 'vscode';
 
-const rawValue = (v: string) => v;
+export default class RedshiftDriver extends BaseDriver<Pool> {
+  private pool: Pool | null = null;
 
-types.setTypeParser((types as any).builtins.TIMESTAMP || 1114, rawValue);
-types.setTypeParser((types as any).builtins.TIMESTAMPTZ || 1184, rawValue);
-types.setTypeParser((types as any).builtins.DATE || 1082, rawValue);
-
-export default class PostgreSQL extends AbstractDriver<Pool, PoolConfig> implements IConnectionDriver {
-  queries = Queries;
-  public async open() {
-    if (this.connection) {
-      return this.connection;
+  public async open(): Promise<void> {
+    if (this.pool) {
+      return;
     }
-    try {
-      const { ssl, ...pgOptions }: PoolConfig = this.credentials.pgOptions || {};
 
-      let poolConfig: PoolConfig = {
-        connectionTimeoutMillis: Number(`${this.credentials.connectionTimeout || 0}`) * 1000,
-        ...pgOptions,
+    const { roleArn, clusterIdentifier, database, region, dbUser, dbGroup, durationSeconds } = this.connection as IRedshiftConnection;
+
+    // Prompt for Role ARN if not provided
+    let finalRoleArn = roleArn;
+    if (!finalRoleArn) {
+      finalRoleArn = await vscode.window.showInputBox({
+        prompt: 'Enter the IAM Role ARN to assume',
+        placeHolder: 'arn:aws:iam::123456789012:role/RedshiftRole',
+        validateInput: (value) => {
+          if (!value.startsWith('arn:aws:iam::')) {
+            return 'Please enter a valid IAM Role ARN';
+          }
+          return null;
+        },
+      });
+
+      if (!finalRoleArn) {
+        throw new Error('IAM Role ARN is required to connect to Redshift');
+      }
+    }
+
+    try {
+      // Step 1: Assume Role using STS
+      const stsClient = new STSClient({ region });
+      const assumeRoleResponse = await stsClient.send(
+        new AssumeRoleCommand({
+          RoleArn: finalRoleArn,
+          RoleSessionName: 'RedshiftDriverSession',
+          DurationSeconds: 3600 // 1 hour
+        })
+      );
+
+      if (!assumeRoleResponse.Credentials) {
+        throw new Error('Failed to obtain temporary credentials from STS');
+      }
+
+      const credentials = {
+        accessKeyId: assumeRoleResponse.Credentials.AccessKeyId!,
+        secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey!,
+        sessionToken: assumeRoleResponse.Credentials.SessionToken!
       };
 
-      if (this.credentials.connectString) {
-        poolConfig = {
-          connectionString: this.credentials.connectString,
-          ...poolConfig,
-        }
-      } else {
-        poolConfig = {
-          database: this.credentials.database,
-          host: this.credentials.server,
-          password: this.credentials.password,
-          port: this.credentials.port,
-          user: this.credentials.username,
-          ...poolConfig,
-        };
-      }
-      if (ssl) {
-        if (typeof ssl === 'object') {
-          const useSsl = {
-            ...ssl,
-          };
-          ['ca', 'key', 'cert', 'pfx'].forEach(key => {
-            if (!useSsl[key]) {
-              delete useSsl[key];
-              return;
-            };
-            this.log.info(`Reading file ${useSsl[key].replace(/^file:\/\//, '')}`)
-            useSsl[key] = fs.readFileSync(useSsl[key].replace(/^file:\/\//, '')).toString();
-          });
-          if (Object.keys(useSsl).length > 0) {
-            poolConfig.ssl = useSsl;
-          }
-        } else {
-          poolConfig.ssl =  ssl || false;
-        }
+      // Step 2: Create Redshift Client with assumed credentials
+      const redshiftClient = new RedshiftClient({ region, credentials });
+
+      // Step 3: Get cluster endpoint
+      const describeClustersResponse = await redshiftClient.send(
+        new DescribeClustersCommand({ ClusterIdentifier: clusterIdentifier })
+      );
+
+      const cluster = describeClustersResponse.Clusters?.[0];
+      if (!cluster || !cluster.Endpoint) {
+        throw new Error('Cluster not found or endpoint unavailable');
       }
 
-      const pool = new Pool(poolConfig);
-      const cli = await pool.connect();
-      cli.release();
-      this.connection = Promise.resolve(pool);
-      return this.connection;
+      const host = cluster.Endpoint.Address;
+      const port = cluster.Endpoint.Port || 5439;
+
+      // Step 4: Get temporary database credentials
+      const getCredentialsResponse = await redshiftClient.send(
+        new GetClusterCredentialsCommand({
+          ClusterIdentifier: clusterIdentifier,
+          DbName: database,
+          DbUser: dbUser,
+          DbGroups: dbGroup ? [dbGroup] : undefined,
+          DurationSeconds: durationSeconds || 3600,
+        })
+      );
+
+      if (!getCredentialsResponse.DbUser || !getCredentialsResponse.DbPassword) {
+        throw new Error('Failed to obtain database credentials');
+      }
+
+      // Step 5: Connect to Redshift using pg
+      const poolConfig: PoolConfig = {
+        host,
+        port,
+        database,
+        user: getCredentialsResponse.DbUser,
+        password: getCredentialsResponse.DbPassword,
+        ssl: { rejectUnauthorized: false }, // Adjust SSL settings as needed
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000
+      };
+
+      this.pool = new Pool(poolConfig);
+      await this.pool.connect(); // Test connection
+
+      // Log connection details for debugging
+      console.log(`Connected to Redshift: host=${host}, port=${port}, user=${getCredentialsResponse.DbUser}`);
     } catch (error) {
-      return Promise.reject(error);
+      throw new Error(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  public async close() {
-    if (!this.connection) return Promise.resolve();
-    const pool = await this.connection;
-    this.connection = null;
-    pool.end();
-  }
-
-  public query: (typeof AbstractDriver)['prototype']['query'] = (query, opt = {}) => {
-    const messages = [];
-    let cli : PoolClient;
-    const { requestId } = opt;
-    return this.open()
-      .then(async (pool) => {
-        cli = await pool.connect();
-        cli.on('notice', notice => messages.push(this.prepareMessage(`${notice.name.toUpperCase()}: ${notice.message}`)));
-        const results = await cli.query({ text: query.toString(), rowMode: 'array' });
-        cli.release();
-        return results;
-      })
-      .then((results: any[] | any) => {
-        const queries = queryParse(query.toString(), 'pg');
-        if (!Array.isArray(results)) {
-          results = [results];
-        }
-
-        return results.map((r, i): NSDatabase.IResult => {
-          const cols = this.getColumnNames(r.fields || []);
-          return {
-            requestId,
-            resultId: generateId(),
-            connId: this.getId(),
-            cols,
-            messages: messages.concat([
-              this.prepareMessage(`${r.command} successfully executed.${
-                r.command.toLowerCase() !== 'select' && typeof r.rowCount === 'number' ? ` ${r.rowCount} rows were affected.` : ''
-              }`)
-            ]),
-            query: queries[i],
-            results: this.mapRows(r.rows, cols),
-          };
-        });
-      })
-      .catch(err => {
-        cli && cli.release();
-        return [<NSDatabase.IResult>{
-          connId: this.getId(),
-          requestId,
-          resultId: generateId(),
-          cols: [],
-          messages: messages.concat([
-            this.prepareMessage ([
-              (err && err.message || err),
-              err && err.routine === 'scanner_yyerror' && err.position ? `at character ${err.position}` : undefined
-            ].filter(Boolean).join(' '))
-          ]),
-          error: true,
-          rawError: err,
-          query,
-          results: [],
-        }];
-      });
-  }
-
-  private getColumnNames(fields: FieldDef[]): string[] {
-    return fields.reduce((names, { name }) => {
-      const count = names.filter((n) => n === name).length;
-      return names.concat(count > 0 ? `${name} (${count})` : name);
-    }, []);
-  }
-
-  private mapRows(rows: any[], columns: string[]): any[] {
-    return rows.map((r) => zipObject(columns, r));
-  }
-
-  private async getColumns(parent: NSDatabase.ITable): Promise<NSDatabase.IColumn[]> {
-    const results = await this.queryResults(this.queries.fetchColumns(parent));
-    return results.map(col => ({
-      ...col,
-      iconName: col.isPk ? 'pk' : (col.isFk ? 'fk' : null),
-      childType: ContextValue.NO_CHILD,
-      table: parent
-    }));
-  }
-
-  public async testConnection() {
-    const pool = await this.open()
-    const cli = await pool.connect();
-    await cli.query('SELECT 1');
-    cli.release();
-  }
-
-  public async getChildrenForItem({ item, parent }: Arg0<IConnectionDriver['getChildrenForItem']>) {
-    switch (item.type) {
-      case ContextValue.CONNECTION:
-      case ContextValue.CONNECTED_CONNECTION:
-        return this.queryResults(this.queries.fetchDatabases());
-      case ContextValue.TABLE:
-      case ContextValue.VIEW:
-      case ContextValue.MATERIALIZED_VIEW:
-        return this.getColumns(item as NSDatabase.ITable);
-      case ContextValue.DATABASE:
-        return <MConnectionExplorer.IChildItem[]>[
-          { label: 'Schemas', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.SCHEMA },
-        ];
-      case ContextValue.RESOURCE_GROUP:
-        return this.getChildrenForGroup({ item, parent });
-      case ContextValue.SCHEMA:
-        return <MConnectionExplorer.IChildItem[]>[
-          { label: 'Tables', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.TABLE },
-          { label: 'Views', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.VIEW },
-          { label: 'Materialized Views', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.MATERIALIZED_VIEW },
-          { label: 'Functions', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.FUNCTION },
-        ];
+  public async close(): Promise<void> {
+    if (!this.pool) {
+      return;
     }
-    return [];
+    await this.pool.end();
+    this.pool = null;
   }
-  private async getChildrenForGroup({ parent, item }: Arg0<IConnectionDriver['getChildrenForItem']>) {
-    switch (item.childType) {
-      case ContextValue.SCHEMA:
-        return this.queryResults(this.queries.fetchSchemas(parent as NSDatabase.IDatabase));
-      case ContextValue.TABLE:
-        return this.queryResults(this.queries.fetchTables(parent as NSDatabase.ISchema));
-      case ContextValue.VIEW:
-        return this.queryResults(this.queries.fetchViews(parent as NSDatabase.ISchema));
-      case ContextValue.MATERIALIZED_VIEW:
-        return this.queryResults(this.queries.fetchMaterializedViews(parent as NSDatabase.ISchema));
-      case ContextValue.FUNCTION:
-        return this.queryResults(this.queries.fetchFunctions(parent as NSDatabase.ISchema));
+
+  public async query(query: string): Promise<NSDatabase.IResult[]> {
+    await this.open();
+    if (!this.pool) {
+      throw new Error('No active connection to Redshift');
+    }
+
+    try {
+      const result = await this.pool.query(query);
+      return [{
+        connId: this.connection.id,
+        cols: result.fields.map(f => f.name),
+        results: result.rows,
+        query,
+        messages: [],
+        requestId: Date.now().toString(),
+        resultId: Date.now().toString(),
+      }];
+    } catch (error) {
+      throw new Error(`Query failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  public async testConnection(): Promise<void> {
+    await this.open();
+    await this.close();
+  }
+
+  public async getChildrenForItem({ item }: { item: NSDatabase.IItem }): Promise<NSDatabase.IItem[]> {
+    if (item.type === ContextValue.CONNECTION) {
+      return [
+        { label: 'Tables', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.TABLE },
+        { label: 'Schemas', type: ContextValue.RESOURCE_GROUP, iconId: 'folder', childType: ContextValue.SCHEMA },
+      ];
     }
     return [];
   }
 
-  public searchItems(itemType: ContextValue, search: string, extraParams: any = {}): Promise<NSDatabase.SearchableItem[]> {
-    switch (itemType) {
-      case ContextValue.TABLE:
-        return this.queryResults(this.queries.searchTables({ search }));
-      case ContextValue.COLUMN:
-        return this.queryResults(this.queries.searchColumns({ search, ...extraParams }));
-    }
+  public async searchItems(): Promise<NSDatabase.SearchableItem[]> {
+    return [];
   }
 
-  private completionsCache: { [w: string]: NSDatabase.IStaticCompletion } = null;
-  public getStaticCompletions = async () => {
-    if (this.completionsCache) return this.completionsCache;
-    this.completionsCache = {};
-    const items = await this.queryResults('SELECT UPPER(word) AS label, UPPER(catdesc) AS desc FROM pg_get_keywords();');
+  public async describeTable(): Promise<NSDatabase.IColumn[]> {
+    // Minimal implementation for now
+    return [];
+  }
 
-    items.forEach((item: any) => {
-      this.completionsCache[item.label] = {
-        label: item.label,
-        detail: item.label,
-        filterText: item.label,
-        sortText: (['SELECT', 'CREATE', 'UPDATE', 'DELETE'].includes(item.label) ? '2:' : '') + item.label,
-        documentation: {
-          value: `\`\`\`yaml\nWORD: ${item.label}\nTYPE: ${item.desc}\n\`\`\``,
-          kind: 'markdown'
-        }
-      }
-    });
-
-    return this.completionsCache;
+  public async showRecords(): Promise<NSDatabase.IResult[]> {
+    // Minimal implementation for now
+    return [];
   }
 }

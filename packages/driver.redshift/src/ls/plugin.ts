@@ -1,13 +1,13 @@
 import { ILanguageServerPlugin } from '@sqltools/types';
-import PostgreSQL from './driver';
-import { DRIVER_ALIASES } from './../constants';
+import RedshiftDriver from './driver';
+import { DRIVER_ALIASES } from '../constants';
 
-const PGDriverPlugin: ILanguageServerPlugin = {
+const RedshiftDriverPlugin: ILanguageServerPlugin = {
   register(server) {
     DRIVER_ALIASES.forEach(({ value }) => {
-      server.getContext().drivers.set(value, PostgreSQL);
+      server.getContext().drivers.set(value, RedshiftDriver);
     });
   }
-}
+};
 
-export default PGDriverPlugin;
+export default RedshiftDriverPlugin;

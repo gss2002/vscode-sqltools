@@ -8,6 +8,7 @@ WHERE
   TABLE_NAME = '${p => p.label}'
   AND TABLE_CATALOG = '${p => p.database}'
   AND TABLE_SCHEMA = '${p => p.schema}'`;
+
 const fetchColumns: IBaseQueries['fetchColumns'] = queryFactory`
 SELECT
   C.COLUMN_NAME AS label,
@@ -52,6 +53,7 @@ FROM ${p => escapeTableName(p.table)}
 LIMIT ${p => p.limit || 50}
 OFFSET ${p => p.offset || 0};
 `;
+
 const countRecords: IBaseQueries['countRecords'] = queryFactory`
 SELECT count(1) AS total
 FROM ${p => escapeTableName(p.table)};
@@ -78,7 +80,7 @@ INNER JOIN pg_catalog.pg_namespace AS n on n.oid = f.pronamespace
 WHERE
   n.nspname = '${p => p.schema}'
 ORDER BY name
-;`;
+`;
 
 const fetchTablesAndViews = (type: ContextValue, tableType = 'BASE TABLE'): IBaseQueries['fetchTables'] => queryFactory`
 SELECT
@@ -165,35 +167,19 @@ LIMIT ${p => p.limit || 100}
 
 const fetchTables: IBaseQueries['fetchTables'] = fetchTablesAndViews(ContextValue.TABLE);
 const fetchViews: IBaseQueries['fetchTables'] = fetchTablesAndViews(ContextValue.VIEW, 'VIEW');
+
+// Redshift does not support materialized views in the same way as PostgreSQL, so we'll skip this query
 const fetchMaterializedViews: IBaseQueries['fetchTables'] = queryFactory`
 SELECT
   '${ContextValue.MATERIALIZED_VIEW}' as type,
   (current_database())::information_schema.sql_identifier AS database,
-  (nc.nspname)::information_schema.sql_identifier AS schema,
-  (c.relname)::information_schema.sql_identifier AS label,
+  (''::text)::information_schema.sql_identifier AS schema,
+  (''::text)::information_schema.sql_identifier AS label,
   'view' AS "iconName",
   '${ContextValue.NO_CHILD}' as "childType"
-FROM pg_namespace nc,
-  pg_class c
-WHERE
-  nc.nspname = '${p => p.schema}'
-  AND (
-    (c.relnamespace = nc.oid)
-    AND (c.relkind = 'm'::"char")
-    AND (NOT pg_is_other_temp_schema(nc.oid))
-    AND (
-      pg_has_role(c.relowner, 'USAGE'::text)
-      OR has_table_privilege(
-        c.oid,
-        'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'::text
-      )
-      OR has_any_column_privilege(
-        c.oid,
-        'SELECT, INSERT, UPDATE, REFERENCES'::text
-      )
-    )
-  );
+WHERE FALSE; -- Redshift does not support materialized views
 `;
+
 const fetchDatabases: IBaseQueries['fetchDatabases'] = queryFactory`
 SELECT
   db.*,
@@ -209,6 +195,7 @@ WHERE
 ORDER BY
   db.datname;
 `;
+
 const fetchSchemas: IBaseQueries['fetchSchemas'] = queryFactory`
 SELECT
   schema_name AS label,

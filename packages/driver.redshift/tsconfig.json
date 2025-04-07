@@ -13,10 +13,7 @@
     "declaration": false,
     "target": "esnext",
     "outDir": "out",
-    "baseUrl": ".",
-    "paths": {
-      "pg-native": ["./node_modules/pg/lib/native", "../../node_modules/pg/lib/native"]
-    }
+    "baseUrl": "."
   },
   "include": [
     "src/**/*"
