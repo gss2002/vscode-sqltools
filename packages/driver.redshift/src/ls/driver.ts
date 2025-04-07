@@ -4,7 +4,6 @@ import { Pool, PoolConfig } from 'pg';
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
 import { RedshiftClient, DescribeClustersCommand, GetClusterCredentialsCommand } from '@aws-sdk/client-redshift';
 import { IRedshiftConnection } from '../types';
-import * as vscode from 'vscode';
 import queries from './queries';
 
 export default class RedshiftDriver extends BaseDriver<Pool, {}> {
@@ -19,23 +18,9 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
 
     const { roleArn, clusterIdentifier, database, region, dbUser, dbGroup, durationSeconds } = this.credentials as IRedshiftConnection;
 
-    // Prompt for Role ARN if not provided
-    let finalRoleArn = roleArn;
-    if (!finalRoleArn) {
-      finalRoleArn = await vscode.window.showInputBox({
-        prompt: 'Enter the IAM Role ARN to assume',
-        placeHolder: 'arn:aws:iam::123456789012:role/RedshiftRole',
-        validateInput: (value) => {
-          if (!value.startsWith('arn:aws:iam::')) {
-            return 'Please enter a valid IAM Role ARN';
-          }
-          return null;
-        },
-      });
-
-      if (!finalRoleArn) {
-        throw new Error('IAM Role ARN is required to connect to Redshift');
-      }
+    // Ensure roleArn is provided (should be handled by the client side)
+    if (!roleArn) {
+      throw new Error('IAM Role ARN is required to connect to Redshift');
     }
 
     try {
@@ -43,7 +28,7 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
       const stsClient = new STSClient({ region });
       const assumeRoleResponse = await stsClient.send(
         new AssumeRoleCommand({
-          RoleArn: finalRoleArn,
+          RoleArn: roleArn,
           RoleSessionName: 'RedshiftDriverSession',
           DurationSeconds: 3600 // 1 hour
         })

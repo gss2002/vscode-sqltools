@@ -1,12 +1,11 @@
-import { IExtension, IExtensionPlugin, IDriverExtensionApi } from '@sqltools/types';
-import { ExtensionContext, extensions, authentication } from 'vscode';
+import * as vscode from 'vscode';
+import { IExtension, IExtensionPlugin, IDriverExtensionApi, IDriverAlias } from '@sqltools/types';
+import { ExtensionContext } from 'vscode';
 import { DRIVER_ALIASES } from './constants';
-const { publisher, name } = require('../package.json');
-const driverName = 'Redshift';
-const AUTHENTICATION_PROVIDER = 'sqltools-driver-credentials';
 
+const driverName = 'Redshift';
 export async function activate(extContext: ExtensionContext): Promise<IDriverExtensionApi> {
-  const sqltools = extensions.getExtension<IExtension>('mtxr.sqltools');
+  const sqltools = vscode.extensions.getExtension<IExtension>('mtxr.sqltools');
   if (!sqltools) {
     throw new Error('SQLTools not installed');
   }
@@ -14,105 +13,75 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
 
   const api = sqltools.exports;
 
-  const extensionId = `${publisher}.${name}`;
+  // Register resources using resourcesMap
+  const resources = api.resourcesMap();
+  DRIVER_ALIASES.forEach(({ value }) => {
+    resources.set(
+      `driver/${value}/extension-id`,
+      extContext.asAbsolutePath('package.json')
+    );
+    resources.set(
+      `driver/${value}/connection-schema`,
+      extContext.asAbsolutePath('connection.schema.json')
+    );
+    resources.set(
+      `driver/${value}/ui-schema`,
+      extContext.asAbsolutePath('ui.schema.json')
+    );
+  });
+
   const plugin: IExtensionPlugin = {
-    extensionId,
-    name: `${driverName} Plugin`,
-    type: 'driver',
-    async register(extension) {
-      // Register extension resources for Redshift
-      extension.resourcesMap().set(`driver/${DRIVER_ALIASES[0].value}/icons`, {
-        active: extContext.asAbsolutePath('icons/redshift/active.png'),
-        default: extContext.asAbsolutePath('icons/redshift/default.png'),
-        inactive: extContext.asAbsolutePath('icons/redshift/inactive.png'),
-      });
+    name: driverName,
+    async register() {
+      const resolveConnection = async (connInfo: any) => {
+        if (!connInfo.roleArn) {
+          const roleArn = await vscode.window.showInputBox({
+            prompt: 'Enter the IAM Role ARN to assume',
+            placeHolder: 'arn:aws:iam::123456789012:role/RedshiftRole',
+            validateInput: (value) => {
+              if (!value.startsWith('arn:aws:iam::')) {
+                return 'Please enter a valid IAM Role ARN';
+              }
+              return null;
+            },
+          });
 
-      DRIVER_ALIASES.forEach(({ value }) => {
-        extension.resourcesMap().set(`driver/${value}/extension-id`, extensionId);
-        extension.resourcesMap().set(`driver/${value}/connection-schema`, extContext.asAbsolutePath('connection.schema.json'));
-        extension.resourcesMap().set(`driver/${value}/ui-schema`, extContext.asAbsolutePath('ui.schema.json'));
-      });
+          if (!roleArn) {
+            throw new Error('IAM Role ARN is required to connect to Redshift');
+          }
 
-      await extension.client.sendRequest('ls/RegisterPlugin', { path: extContext.asAbsolutePath('out/ls/plugin.js') });
-    }
+          connInfo.roleArn = roleArn;
+        }
+
+        if (connInfo.usePassword === 'Ask on connect') {
+          const password = await vscode.window.showInputBox({
+            password: true,
+            prompt: `Enter password for ${connInfo.name}`,
+          });
+          if (password === undefined) {
+            throw new Error('Password prompt cancelled');
+          }
+          connInfo.password = password;
+          connInfo.usePassword = 'Save as plaintext in settings';
+        }
+      };
+
+      // Register the driver via the plugin
+      return {
+        type: 'driver',
+        name: driverName,
+        aliases: DRIVER_ALIASES.map(({ value }) => value),
+        resolveConnection,
+      };
+    },
   };
+
+  // Register the plugin with SQLTools
   api.registerPlugin(plugin);
 
   return {
     driverName,
-    parseBeforeSaveConnection: ({ connInfo }) => {
-      const propsToRemove = ['connectionMethod', 'id', 'usePassword'];
-      if (connInfo.usePassword) {
-        if (connInfo.usePassword.toString().toLowerCase().includes('ask')) {
-          connInfo.askForPassword = true;
-          propsToRemove.push('password');
-        } else if (connInfo.usePassword.toString().toLowerCase().includes('empty')) {
-          connInfo.password = '';
-          propsToRemove.push('askForPassword');
-        } else if (connInfo.usePassword.toString().toLowerCase().includes('save')) {
-          propsToRemove.push('askForPassword');
-        } else if (connInfo.usePassword.toString().toLowerCase().includes('secure')) {
-          propsToRemove.push('password');
-          propsToRemove.push('askForPassword');
-        }
-      }
-      propsToRemove.forEach(p => delete connInfo[p]);
-
-      // Redshift-specific: Remove connectionMethod since we don't support connectString or socketPath
-      delete connInfo.connectionMethod;
-
-      // Redshift doesn't use pgOptions for SSL in this implementation
-      delete connInfo.pgOptions;
-
-      return connInfo;
-    },
-    parseBeforeEditConnection: ({ connInfo }) => {
-      const formData: typeof connInfo = {
-        ...connInfo,
-        connectionMethod: 'Server and Port', // Redshift always uses server and port
-      };
-
-      if (connInfo.askForPassword) {
-        formData.usePassword = 'Ask on connect';
-        delete formData.password;
-      } else if (typeof connInfo.password === 'string') {
-        delete formData.askForPassword;
-        formData.usePassword = connInfo.password ? 'Save as plaintext in settings' : 'Use empty password';
-      } else {
-        formData.usePassword = 'SQLTools Driver Credentials';
-      }
-
-      // Redshift doesn't use pgOptions for SSL in this implementation
-      delete formData.pgOptions;
-
-      return formData;
-    },
-    resolveConnection: async ({ connInfo }) => {
-      /**
-       * This hook is called after a connection definition has been fetched
-       * from settings and is about to be used to connect.
-       */
-      if (connInfo.password === undefined && !connInfo.askForPassword) {
-        const scopes = [connInfo.name, (connInfo.dbUser || "")];
-        let session = await authentication.getSession(
-          AUTHENTICATION_PROVIDER,
-          scopes,
-          { silent: true }
-        );
-        if (!session) {
-          session = await authentication.getSession(
-            AUTHENTICATION_PROVIDER,
-            scopes,
-            { createIfNone: true }
-          );
-        }
-        if (session) {
-          connInfo.password = session.accessToken;
-        }
-      }
-      return connInfo;
-    },
-    driverAliases: DRIVER_ALIASES,
+    driverAliases: DRIVER_ALIASES as IDriverAlias[], // Add driverAliases
   };
 }
 
