@@ -48,6 +48,7 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
       database: (this.credentials as RedshiftConnection).database,
       user: credentials.dbUser,
       password: credentials.dbPassword,
+      ssl: { rejectUnauthorized: false }, // Enable SSL, allow self-signed certs for testing
     });
     const cli = await this.pool.connect();
     cli.release();
