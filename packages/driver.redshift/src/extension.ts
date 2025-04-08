@@ -2,24 +2,27 @@ import * as vscode from 'vscode';
 import { IExtension, IExtensionPlugin, IDriverExtensionApi, IDriverAlias } from '@sqltools/types';
 import { ExtensionContext } from 'vscode';
 import { DRIVER_ALIASES } from './constants';
+import RedshiftDriver from './ls/plugin';
 
 const driverName = 'Redshift';
+let outputChannel: vscode.OutputChannel;
+
 export async function activate(extContext: ExtensionContext): Promise<IDriverExtensionApi> {
-  console.log('Activating SQLTools Redshift Driver extension');
+  outputChannel = vscode.window.createOutputChannel('Redshift Driver');
+  outputChannel.appendLine('Activating SQLTools Redshift Driver extension');
 
   const sqltools = vscode.extensions.getExtension<IExtension>('mtxr.sqltools');
   if (!sqltools) {
-    console.error('SQLTools extension not found');
+    outputChannel.appendLine('SQLTools extension not found');
     throw new Error('SQLTools not installed');
   }
 
-  console.log('SQLTools extension found, activating...');
+  outputChannel.appendLine('SQLTools extension found, activating...');
   await sqltools.activate();
 
   const api = sqltools.exports;
-  console.log('SQLTools API obtained:', api);
+  outputChannel.appendLine('SQLTools API obtained: ' + Object.keys(api).join(', '));
 
-  // Register resources using resourcesMap
   const resources = api.resourcesMap();
   DRIVER_ALIASES.forEach(({ value }) => {
     resources.set(
@@ -34,6 +37,7 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
       `driver/${value}/ui-schema`,
       extContext.asAbsolutePath('ui.schema.json')
     );
+    outputChannel.appendLine(`Registered resource: driver/${value}`);
   });
 
   const plugin: IExtensionPlugin = {
@@ -72,29 +76,40 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
         }
       };
 
-      console.log(`Registering Redshift driver with aliases: ${DRIVER_ALIASES.map(({ value }) => value).join(', ')}`);
-
-      return {
+      const driverConfig = {
         type: 'driver',
         name: driverName,
-        aliases: DRIVER_ALIASES.map(({ value }) => value),
+        displayName: 'Amazon Redshift',
+        description: 'Amazon Redshift driver with IAM authentication',
+        aliases: [],
         resolveConnection,
+        driver: (conn) => new RedshiftDriver(conn), // Pass connection info
       };
+
+      outputChannel.appendLine('Registering Redshift driver with config:');
+      outputChannel.appendLine(JSON.stringify(driverConfig, null, 2));
+
+      return driverConfig;
     },
   };
 
-  // Register the plugin with SQLTools
-  console.log('Registering Redshift driver plugin with SQLTools');
+  outputChannel.appendLine('Registering Redshift driver plugin with SQLTools');
   api.registerPlugin(plugin);
 
-  console.log('Redshift driver plugin registered successfully');
+  outputChannel.appendLine('Redshift driver plugin registered successfully');
 
-  return {
+  const driverApi = {
     driverName,
     driverAliases: DRIVER_ALIASES as IDriverAlias[],
   };
+
+  outputChannel.appendLine('Returning driver API:');
+  outputChannel.appendLine(JSON.stringify(driverApi, null, 2));
+
+  return driverApi;
 }
 
 export function deactivate() {
-  console.log('Deactivating SQLTools Redshift Driver extension');
+  outputChannel.appendLine('Deactivating SQLTools Redshift Driver extension');
+  outputChannel.dispose();
 }

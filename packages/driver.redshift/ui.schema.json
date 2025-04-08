@@ -1,26 +1,12 @@
 {
-  "ui:order": ["name", "roleArn", "clusterIdentifier", "database", "region", "dbUser", "dbGroup", "durationSeconds", "usePassword", "password"],
-  "password": { "ui:widget": "password" },
-  "askForPassword": { "ui:widget": "hidden" },
-  "roleArn": {
-    "ui:help": "IAM Role ARN to assume for authentication (optional, can be provided via dialog)"
-  },
-  "clusterIdentifier": {
-    "ui:help": "Redshift cluster identifier (e.g., my-redshift-cluster)"
-  },
-  "database": {
-    "ui:help": "Database name (e.g., dev)"
-  },
-  "region": {
-    "ui:help": "AWS region (e.g., us-east-1)"
-  },
-  "dbUser": {
-    "ui:help": "Database user (e.g., redshift_user)"
-  },
-  "dbGroup": {
-    "ui:help": "Database group (optional, e.g., my-db-group)"
-  },
-  "durationSeconds": {
-    "ui:help": "Duration in seconds for temporary credentials (default: 3600)"
-  }
+  "ui:order": [
+    "name",
+    "roleArn",
+    "clusterIdentifier",
+    "database",
+    "region",
+    "dbUser",
+    "dbGroup",
+    "durationSeconds"
+  ]
 }

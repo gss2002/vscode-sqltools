@@ -1,128 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "definitions": {
-    "database": {
-      "title": "Database",
-      "type": "string",
-      "minLength": 1
-    },
-    "dbUser": {
-      "title": "Database User",
-      "type": "string",
-      "minLength": 1
-    },
-    "usePassword": {
-      "title": "Use password",
-      "type": "string",
-      "enum": [
-        "SQLTools Driver Credentials",
-        "Ask on connect",
-        "Use empty password",
-        "Save as plaintext in settings"
-      ],
-      "default": "SQLTools Driver Credentials"
-    },
-    "password": {
-      "title": "Password",
-      "type": "string",
-      "minLength": 1
-    }
-  },
   "properties": {
-    "name": {
-      "title": "Connection Name",
-      "type": "string",
-      "minLength": 1
-    },
-    "roleArn": {
-      "title": "IAM Role ARN",
-      "type": "string",
-      "description": "IAM Role ARN to assume for authentication (optional, can be provided via dialog)",
-      "minLength": 1
-    },
-    "clusterIdentifier": {
-      "title": "Cluster Identifier",
-      "type": "string",
-      "minLength": 1,
-      "description": "Redshift cluster identifier (e.g., my-redshift-cluster)"
-    },
-    "database": {
-      "$ref": "#/definitions/database"
-    },
-    "region": {
-      "title": "AWS Region",
-      "type": "string",
-      "minLength": 1,
-      "description": "AWS region (e.g., us-east-1)"
-    },
-    "dbUser": {
-      "$ref": "#/definitions/dbUser"
-    },
-    "dbGroup": {
-      "title": "Database Group",
-      "type": "string",
-      "description": "Database group (optional, e.g., my-db-group)"
-    },
-    "durationSeconds": {
-      "title": "Credentials Duration (seconds)",
-      "type": "integer",
-      "minimum": 900,
-      "maximum": 3600,
-      "default": 3600,
-      "description": "Duration in seconds for temporary credentials (default: 3600)"
-    },
-    "usePassword": {
-      "$ref": "#/definitions/usePassword"
-    }
+    "name": { "type": "string" },
+    "roleArn": { "type": "string" },
+    "clusterIdentifier": { "type": "string" },
+    "database": { "type": "string" },
+    "region": { "type": "string" },
+    "dbUser": { "type": "string" },
+    "dbGroup": { "type": "string" },
+    "durationSeconds": { "type": "number" }
   },
-  "dependencies": {
-    "usePassword": {
-      "oneOf": [
-        {
-          "properties": {
-            "usePassword": {
-              "enum": ["Ask on connect"]
-            },
-            "askForPassword": {
-              "type": "boolean",
-              "default": true
-            }
-          }
-        },
-        {
-          "properties": {
-            "usePassword": {
-              "enum": ["Use empty password"]
-            }
-          }
-        },
-        {
-          "properties": {
-            "usePassword": {
-              "enum": ["Save as plaintext in settings"]
-            },
-            "password": {
-              "$ref": "#/definitions/password"
-            }
-          },
-          "required": ["password"]
-        },
-        {
-          "properties": {
-            "usePassword": {
-              "enum": ["SQLTools Driver Credentials"]
-            }
-          }
-        }
-      ]
-    }
-  },
-  "required": [
-    "name",
-    "clusterIdentifier",
-    "database",
-    "region",
-    "dbUser"
-  ]
+  "required": ["name", "clusterIdentifier", "database", "region", "dbUser"]
 }

@@ -40,9 +40,7 @@
     "mtxr.sqltools"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onLanguage:sql",
-    "onCommand:sqltools.*"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -52,6 +50,9 @@
           "name": "Redshift",
           "description": "Amazon Redshift driver with IAM authentication",
           "connection": {
+            "languageServer": {
+              "path": "out/ls/plugin.js"
+            },
             "fields": [
               {
                 "name": "name",
@@ -154,7 +155,7 @@
     "@types/node": "^22.14.0",
     "@types/pg": "^7.14.3",
     "@types/vscode": "^1.78.0",
-    "@vscode/vsce": "^2.19.0",
+    "@vscode/vsce": "^3.1.1",
     "concurrently": "^5.2.0",
     "esbuild": "^0.25.0",
     "patch-package": "^8.0.0",
