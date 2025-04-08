@@ -4,8 +4,7 @@
   "description": "Amazon Redshift driver for SQLTools with IAM authentication",
   "version": "0.5.6-SNAPSHOT",
   "engines": {
-    "vscode": "^1.78.0",
-    "node": ">=14.0.0"
+    "vscode": "^1.78.0"
   },
   "publisher": "your-publisher-name",
   "license": "MIT",
@@ -40,7 +39,9 @@
     "mtxr.sqltools"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "*",
+    "onLanguage:sql",
+    "onCommand:sqltools.*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -48,68 +49,18 @@
       "drivers": [
         {
           "name": "Redshift",
+          "displayName": "Amazon Redshift",
           "description": "Amazon Redshift driver with IAM authentication",
           "connection": {
-            "languageServer": {
-              "path": "out/ls/plugin.js"
-            },
             "fields": [
-              {
-                "name": "name",
-                "label": "Connection Name",
-                "type": "string",
-                "required": true
-              },
-              {
-                "name": "roleArn",
-                "label": "IAM Role ARN (optional, can be provided via dialog)",
-                "type": "string",
-                "required": false,
-                "placeholder": "arn:aws:iam::123456789012:role/RedshiftRole"
-              },
-              {
-                "name": "clusterIdentifier",
-                "label": "Cluster Identifier",
-                "type": "string",
-                "required": true,
-                "placeholder": "my-redshift-cluster"
-              },
-              {
-                "name": "database",
-                "label": "Database Name",
-                "type": "string",
-                "required": true,
-                "placeholder": "dev"
-              },
-              {
-                "name": "region",
-                "label": "AWS Region",
-                "type": "string",
-                "required": true,
-                "placeholder": "us-east-1"
-              },
-              {
-                "name": "dbUser",
-                "label": "Database User",
-                "type": "string",
-                "required": true,
-                "placeholder": "redshift_user"
-              },
-              {
-                "name": "dbGroup",
-                "label": "Database Group (optional)",
-                "type": "string",
-                "required": false,
-                "placeholder": "my-db-group"
-              },
-              {
-                "name": "durationSeconds",
-                "label": "Credentials Duration (seconds, optional)",
-                "type": "number",
-                "required": false,
-                "default": 3600,
-                "placeholder": "3600"
-              }
+              { "name": "name", "label": "Connection Name", "type": "string", "required": true },
+              { "name": "roleArn", "label": "IAM Role ARN (optional)", "type": "string", "required": false, "placeholder": "arn:aws:iam::123456789012:role/RedshiftRole" },
+              { "name": "clusterIdentifier", "label": "Cluster Identifier", "type": "string", "required": true, "placeholder": "my-redshift-cluster" },
+              { "name": "database", "label": "Database Name", "type": "string", "required": true, "placeholder": "dev" },
+              { "name": "region", "label": "AWS Region", "type": "string", "required": true, "placeholder": "us-east-1" },
+              { "name": "dbUser", "label": "Database User", "type": "string", "required": true, "placeholder": "redshift_user" },
+              { "name": "dbGroup", "label": "Database Group (optional)", "type": "string", "required": false, "placeholder": "my-db-group" },
+              { "name": "durationSeconds", "label": "Credentials Duration (seconds, optional)", "type": "number", "required": false, "default": 3600, "placeholder": "3600" }
             ]
           }
         }
@@ -139,18 +90,19 @@
     "ts": "tsc -p .",
     "postinstall": "patch-package"
   },
+  "files": [
+    "out",
+    "icons/*.png"
+  ],
   "dependencies": {
     "@aws-sdk/client-redshift": "^3.556.0",
     "@aws-sdk/client-sts": "^3.556.0",
-    "@sqltools/base-driver": "file:../base-driver",
-    "@sqltools/log": "file:../log",
-    "@sqltools/types": "file:../types",
+    "@sqltools/base-driver": "latest",
+    "@sqltools/types": "^0.1.6",
     "lodash": "^4.17.19",
     "pg": "^8.2.1"
   },
   "devDependencies": {
-    "@sqltools/base-driver": "latest",
-    "@sqltools/types": "^0.1.6",
     "@types/lodash": "^4.14.123",
     "@types/node": "^22.14.0",
     "@types/pg": "^7.14.3",
