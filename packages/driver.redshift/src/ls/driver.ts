@@ -198,7 +198,21 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
   }
 
   private async getHost(conn: RedshiftConnection): Promise<string> {
-    const redshiftClient = new RedshiftClient({ region: conn.region });
+    const stsClient = new STSClient({ region: conn.region });
+    const assumeRoleParams = {
+      RoleArn: conn.roleArn,
+      RoleSessionName: `RedshiftSession-${Date.now()}`,
+      DurationSeconds: conn.durationSeconds || 3600,
+    };
+    const { Credentials } = await stsClient.send(new AssumeRoleCommand(assumeRoleParams));
+    const redshiftClient = new RedshiftClient({
+      region: conn.region,
+      credentials: {
+        accessKeyId: Credentials!.AccessKeyId!,
+        secretAccessKey: Credentials!.SecretAccessKey!,
+        sessionToken: Credentials!.SessionToken!,
+      },
+    });
     const { Clusters } = await redshiftClient.send(
       new DescribeClustersCommand({ ClusterIdentifier: conn.clusterIdentifier })
     );
