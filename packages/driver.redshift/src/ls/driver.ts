@@ -3,7 +3,7 @@ import { IConnection, NSDatabase, ContextValue, MConnectionExplorer } from '@sql
 import {
   RedshiftClient,
   DescribeClustersCommand,
-  GetClusterCredentialsWithIAMCommand,
+  GetClusterCredentialsCommand,
 } from '@aws-sdk/client-redshift';
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
 import { Pool, PoolClient } from 'pg';
@@ -190,7 +190,7 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
       AutoCreate: false,
       DurationSeconds: conn.durationSeconds || 3600,
     };
-    const response = await redshiftClient.send(new GetClusterCredentialsWithIAMCommand(params));
+    const response = await redshiftClient.send(new GetClusterCredentialsCommand(params));
     return {
       dbUser: response.DbUser!,
       dbPassword: response.DbPassword!,
