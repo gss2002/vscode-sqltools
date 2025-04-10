@@ -5,7 +5,6 @@ import {
   DescribeClustersCommand,
   GetClusterCredentialsCommand,
 } from '@aws-sdk/client-redshift';
-import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
 import { Pool, PoolClient } from 'pg';
 import queries from './queries';
@@ -14,7 +13,6 @@ import zipObject from 'lodash/zipObject';
 
 interface RedshiftConnection extends IConnection {
   roleArn: string;
-  roleLookup: string;
   clusterIdentifier: string;
   database: string;
   region: string;
@@ -169,46 +167,16 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
     return Promise.resolve([]);
   }
 
-  private async getSSMParameter(parameterName: string, region: string): Promise<string> {
-    try {
-      const ssmClient = new SSMClient({ region: region || 'us-east-1' });
-      const command = new GetParameterCommand({
-        Name: parameterName,
-        WithDecryption: false, // Set to true if the parameter is encrypted (e.g., SecureString)
-      });
-      const response = await ssmClient.send(command);
-      if (!response.Parameter || !response.Parameter.Value) {
-        throw new Error(`No value found for SSM parameter: ${parameterName}`);
-      }
-      return response.Parameter.Value;
-    } catch (error) {
-      throw new Error(`Failed to fetch SSM parameter ${parameterName}: ${error.message}`);
-    }
-  }
-
   private async getCredentials(conn: RedshiftConnection): Promise<{ dbUser: string; dbPassword: string }> {
-    const region = conn.region || 'us-east-1'; // Use region from connection settings
-    let roleArn = conn.roleArn;
-
-    // If ssmRoleArnParameter is provided, fetch roleArn from SSM using the connection's region
-    if (conn.ssmRoleArnParameter) {
-      roleArn = await this.getSSMParameter(conn.ssmRoleArnParameter, region);
-    }
-
-    if (!roleArn) {
-      throw new Error('roleArn or ssmRoleArnParameter must be provided');
-    }
-
-    const stsClient = new STSClient({ region: region });
-
+    const stsClient = new STSClient({ region: conn.region });
     const assumeRoleParams = {
-      RoleArn: roleArn,
+      RoleArn: conn.roleArn,
       RoleSessionName: `RedshiftSession-${Date.now()}`,
       DurationSeconds: conn.durationSeconds || 3600,
     };
     const { Credentials } = await stsClient.send(new AssumeRoleCommand(assumeRoleParams));
     const redshiftClient = new RedshiftClient({
-      region: region,
+      region: conn.region,
       credentials: {
         accessKeyId: Credentials!.AccessKeyId!,
         secretAccessKey: Credentials!.SecretAccessKey!,

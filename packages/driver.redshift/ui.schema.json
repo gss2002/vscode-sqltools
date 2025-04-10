@@ -2,7 +2,6 @@
   "ui:order": [
     "name",
     "roleArn",
-    "roleLookup",
     "clusterIdentifier",
     "database",
     "region",

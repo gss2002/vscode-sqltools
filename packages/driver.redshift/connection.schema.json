@@ -4,7 +4,6 @@
   "properties": {
     "name": { "type": "string" },
     "roleArn": { "type": "string" },
-    "roleLookup": { "type": "string" },
     "clusterIdentifier": { "type": "string" },
     "database": { "type": "string" },
     "username": { "type": "string" },
@@ -14,6 +13,6 @@
     "dbGroup": { "type": "string" },
     "durationSeconds": { "type": "number" }
   },
-  "required": ["clusterIdentifier", "database", "username"],
+  "required": ["roleArn", "clusterIdentifier", "database", "username"],
   "additionalProperties": true
 }

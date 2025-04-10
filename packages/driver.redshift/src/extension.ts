@@ -8,7 +8,6 @@ const extensionId = `${publisher}.${name}`;
 
 interface RedshiftConnection extends IConnection<any> {
   roleArn: string;
-  roleLookup: string;
   clusterIdentifier: string;
   database: string;
   region?: string;
@@ -63,7 +62,6 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
     name: connInfo.name,
     driver: 'Redshift',
     roleArn: connInfo.roleArn,
-    roleLookup: connInfo.roleLookup,
     clusterIdentifier: connInfo.clusterIdentifier,
     database: connInfo.database,
     region: connInfo.region || 'us-east-1',

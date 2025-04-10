@@ -53,77 +53,16 @@
           "description": "Amazon Redshift driver with IAM authentication",
           "connection": {
             "fields": [
-              {
-                "name": "name",
-                "label": "Connection Name",
-                "type": "string",
-                "required": true
-              },
-              {
-                "name": "roleArn",
-                "label": "IAM Role ARN",
-                "type": "string",
-                "required": false
-              },
-              {
-                "name": "roleLookup",
-                "label": "IAM Role ARN Lookup from Parameter Store Value",
-                "type": "string",
-                "required": false
-              },
-              {
-                "name": "clusterIdentifier",
-                "label": "Cluster Identifier",
-                "type": "string",
-                "required": true
-              },
-              {
-                "name": "database",
-                "label": "Database Name",
-                "type": "string",
-                "required": true
-              },
-              {
-                "name": "region",
-                "label": "AWS Region",
-                "type": "string",
-                "required": false,
-                "default": "us-east-1",
-                "placeholder": "us-east-1"
-              },
-              {
-                "name": "username",
-                "label": "Database User",
-                "type": "string",
-                "required": true
-              },
-              {
-                "name": "dbGroup",
-                "label": "Database Group (optional)",
-                "type": "string",
-                "required": false
-              },
-              {
-                "name": "durationSeconds",
-                "label": "Credentials Duration (seconds, optional)",
-                "type": "number",
-                "required": false,
-                "default": 3600
-              },
-              {
-                "name": "port",
-                "label": "Port (optional)",
-                "type": "number",
-                "required": false,
-                "default": 5439
-              },
-              {
-                "name": "ssl",
-                "label": "Use SSL (optional)",
-                "type": "boolean",
-                "required": false,
-                "default": true
-              }
+              { "name": "name", "label": "Connection Name", "type": "string", "required": true },
+              { "name": "roleArn", "label": "IAM Role ARN", "type": "string", "required": true },
+              { "name": "clusterIdentifier", "label": "Cluster Identifier", "type": "string", "required": true },
+              { "name": "database", "label": "Database Name", "type": "string", "required": true },
+              { "name": "region", "label": "AWS Region", "type": "string", "required": false, "default": "us-east-1", "placeholder": "us-east-1" },
+              { "name": "username", "label": "Database User", "type": "string", "required": true },
+              { "name": "dbGroup", "label": "Database Group (optional)", "type": "string", "required": false },
+              { "name": "durationSeconds", "label": "Credentials Duration (seconds, optional)", "type": "number", "required": false, "default": 3600 },
+              { "name": "port", "label": "Port (optional)", "type": "number", "required": false, "default": 5439 },
+              { "name": "ssl", "label": "Use SSL (optional)", "type": "boolean", "required": false, "default": true }
             ]
           }
         }
@@ -159,7 +98,6 @@
   ],
   "dependencies": {
     "@aws-sdk/client-redshift": "^3.556.0",
-    "@aws-sdk/client-ssm": "^3.782.0",
     "@aws-sdk/client-sts": "^3.556.0",
     "@sqltools/base-driver": "latest",
     "@sqltools/types": "^0.1.6",
