@@ -5,7 +5,7 @@ export interface IRedshiftConnection extends IConnection {
   clusterIdentifier: string;
   database: string;
   region: string;
-  dbUser: string;
+  username: string;
   dbGroup?: string;
   durationSeconds?: number;
 }

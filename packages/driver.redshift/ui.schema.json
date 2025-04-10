@@ -5,8 +5,10 @@
     "clusterIdentifier",
     "database",
     "region",
-    "dbUser",
+    "username",
     "dbGroup",
-    "durationSeconds"
+    "durationSeconds",
+    "port",
+    "ssl"
   ]
 }

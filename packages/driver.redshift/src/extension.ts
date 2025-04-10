@@ -1,10 +1,22 @@
-import { IExtension, IExtensionPlugin, IDriverExtensionApi } from '@sqltools/types';
+import { IExtension, IExtensionPlugin, IDriverExtensionApi, IConnection } from '@sqltools/types';
 import { ExtensionContext, extensions } from 'vscode';
 import { DRIVER_ALIASES } from './constants';
 
 const { publisher, name } = require('../package.json');
 const driverName = 'Redshift';
 const extensionId = `${publisher}.${name}`;
+
+interface RedshiftConnection extends IConnection<any> {
+  roleArn: string;
+  clusterIdentifier: string;
+  database: string;
+  region?: string;
+  username: string;
+  dbGroup?: string;
+  durationSeconds?: number;
+  port?: number;
+  ssl?: boolean;
+}
 
 export async function activate(extContext: ExtensionContext): Promise<IDriverExtensionApi> {
   const sqltools = extensions.getExtension<IExtension>('mtxr.sqltools');
@@ -43,6 +55,28 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
   return {
     driverName,
     driverAliases: DRIVER_ALIASES,
+    parseBeforeSaveConnection: ({ connInfo }) => {
+  console.log('Before saving, raw connInfo:', JSON.stringify(connInfo, null, 2));
+  const cleanedConnInfo: RedshiftConnection = {
+    ...connInfo,
+    name: connInfo.name,
+    driver: 'Redshift',
+    roleArn: connInfo.roleArn,
+    clusterIdentifier: connInfo.clusterIdentifier,
+    database: connInfo.database,
+    region: connInfo.region || 'us-east-1',
+    username: connInfo.username,
+    dbGroup: connInfo.dbGroup || undefined,
+    durationSeconds: connInfo.durationSeconds ? Number(connInfo.durationSeconds) : undefined,
+    port: connInfo.port ? Number(connInfo.port) : 5439,
+    ssl: connInfo.ssl !== undefined ? Boolean(connInfo.ssl) : true,
+    id: connInfo.id || `${connInfo.name}-${Date.now()}`,
+    isConnected: connInfo.isConnected || false,
+    isActive: connInfo.isActive || false
+  };
+  console.log('After cleaning, connInfo:', JSON.stringify(cleanedConnInfo, null, 2));
+  return cleanedConnInfo;
+  }
   };
 }
 

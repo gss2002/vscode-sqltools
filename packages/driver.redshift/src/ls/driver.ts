@@ -16,7 +16,7 @@ interface RedshiftConnection extends IConnection {
   clusterIdentifier: string;
   database: string;
   region: string;
-  dbUser: string;
+  username: string;
   dbGroup?: string;
   durationSeconds?: number;
   port?: number;
@@ -185,7 +185,7 @@ export default class RedshiftDriver extends BaseDriver<Pool, {}> {
     });
     const params = {
       ClusterIdentifier: conn.clusterIdentifier,
-      DbUser: conn.dbUser,
+      DbUser: conn.username,
       DbName: conn.database,
       DbGroups: conn.dbGroup ? [conn.dbGroup] : undefined,
       AutoCreate: false,

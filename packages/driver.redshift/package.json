@@ -54,13 +54,15 @@
           "connection": {
             "fields": [
               { "name": "name", "label": "Connection Name", "type": "string", "required": true },
-              { "name": "roleArn", "label": "IAM Role ARN (optional)", "type": "string", "required": false, "placeholder": "arn:aws:iam::123456789012:role/RedshiftRole" },
-              { "name": "clusterIdentifier", "label": "Cluster Identifier", "type": "string", "required": true, "placeholder": "my-redshift-cluster" },
-              { "name": "database", "label": "Database Name", "type": "string", "required": true, "placeholder": "dev" },
-              { "name": "region", "label": "AWS Region", "type": "string", "required": true, "placeholder": "us-east-1" },
-              { "name": "dbUser", "label": "Database User", "type": "string", "required": true, "placeholder": "redshift_user" },
-              { "name": "dbGroup", "label": "Database Group (optional)", "type": "string", "required": false, "placeholder": "my-db-group" },
-              { "name": "durationSeconds", "label": "Credentials Duration (seconds, optional)", "type": "number", "required": false, "default": 3600, "placeholder": "3600" }
+              { "name": "roleArn", "label": "IAM Role ARN", "type": "string", "required": true },
+              { "name": "clusterIdentifier", "label": "Cluster Identifier", "type": "string", "required": true },
+              { "name": "database", "label": "Database Name", "type": "string", "required": true },
+              { "name": "region", "label": "AWS Region", "type": "string", "required": false, "default": "us-east-1", "placeholder": "us-east-1" },
+              { "name": "username", "label": "Database User", "type": "string", "required": true },
+              { "name": "dbGroup", "label": "Database Group (optional)", "type": "string", "required": false },
+              { "name": "durationSeconds", "label": "Credentials Duration (seconds, optional)", "type": "number", "required": false, "default": 3600 },
+              { "name": "port", "label": "Port (optional)", "type": "number", "required": false, "default": 5439 },
+              { "name": "ssl", "label": "Use SSL (optional)", "type": "boolean", "required": false, "default": true }
             ]
           }
         }

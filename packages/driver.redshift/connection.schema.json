@@ -6,10 +6,13 @@
     "roleArn": { "type": "string" },
     "clusterIdentifier": { "type": "string" },
     "database": { "type": "string" },
-    "region": { "type": "string" },
-    "dbUser": { "type": "string" },
+    "username": { "type": "string" },
+    "region": { "type": "string", "default": "us-east-1" },
+    "port": { "type": "number", "default": 5439 },
+    "ssl": { "type": "boolean", "default": true },
     "dbGroup": { "type": "string" },
     "durationSeconds": { "type": "number" }
   },
-  "required": ["name", "clusterIdentifier", "database", "region", "dbUser"]
+  "required": ["roleArn", "clusterIdentifier", "database", "username"],
+  "additionalProperties": true
 }
