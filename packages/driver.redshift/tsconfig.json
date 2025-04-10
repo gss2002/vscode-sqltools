@@ -13,6 +13,7 @@
     "declaration": false,
     "target": "esnext",
     "outDir": "out",
+    "skipLibCheck": true,
     "baseUrl": ".",
     "typeRoots": [
       "./node_modules/@types"
